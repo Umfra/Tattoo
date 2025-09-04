@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Калькулятор витрати палива</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 750px;
+      margin: 40px auto;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    h2, h3 {
+      text-align: center;
+    }
+    label {
+      display: block;
+      margin: 12px 0 6px;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    button {
+      margin-top: 16px;
+      padding: 10px 16px;
+      font-size: 16px;
+      background: #2d89ef;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1b5fbf;
+    }
+    .result {
+      margin-top: 20px;
+      font-size: 18px;
+      text-align: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background: #f0f0f0;
+      cursor: pointer;
+    }
+    .delete-btn {
+      background: #d9534f;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .delete-btn:hover {
+      background: #b52b27;
+    }
+  </style>
+</head>
+<body>
+  <h2>Калькулятор витрати палива</h2>
+
+  <label for="station">Назва АЗК:</label>
+  <input type="text" id="station" placeholder="Наприклад, ОККО">
+
+  <label for="fuelType">Тип палива:</label>
+  <input type="text" id="fuelType" placeholder="Наприклад, LPG, CNG, бензин">
+
+  <label for="fuel">Об'єм палива (л, м³ чи кг):</label>
+  <input type="number" id="fuel" step="0.01">
+
+  <label for="distance">Відстань (км):</label>
+  <input type="number" id="distance" step="0.1">
+
+  <label for="price">Ціна палива (грн за одиницю):</label>
+  <input type="number" id="price" step="0.01">
+
+  <button onclick="calculate()">Розрахувати</button>
+  <button onclick="saveResult()">Зберегти поїздку</button>
+
+  <div class="result" id="result"></div>
+
+  <h3>Історія поїздок</h3>
+  <table id="historyTable">
+    <thead>
+      <tr>
+        <th onclick="sortTable(0)">АЗК</th>
+        <th onclick="sortTable(1)">Тип палива</th>
+        <th onclick="sortTable(2)">Витрата (на 100 км)</th>
+        <th onclick="sortTable(3)">Ефективність (км/од.)</th>
+        <th onclick="sortTable(4)">Вартість/100 км</th>
+        <th onclick="sortTable(5)">Загальна вартість</th>
+        <th>Дія</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    let lastCalculation = null;
+
+    function calculate() {
+      const station = document.getElementById('station').value.trim();
+      const fuelType = document.getElementById('fuelType').value.trim();
+      const fuel = parseFloat(document.getElementById('fuel').value);
+      const distance = parseFloat(document.getElementById('distance').value);
+      const price = parseFloat(document.getElementById('price').value);
+
+      if (fuel > 0 && distance > 0) {
+        const consumption = (fuel / distance) * 100;
+        const efficiency = distance / fuel;
+        let costPer100 = null;
+        let totalCost = null;
+
+        if (price > 0) {
+          costPer100 = consumption * price;
+          totalCost = fuel * price;
+        }
+
+        lastCalculation = { station, fuelType, consumption, efficiency, costPer100, totalCost };
+
+        document.getElementById('result').innerHTML = 
+          `<p><b>АЗК:</b> ${station || '-'} | <b>Тип палива:</b> ${fuelType || '-'}</p>
+           <p><b>Витрата:</b> ${consumption.toFixed(2)} на 100 км</p>
+           <p><b>Ефективність:</b> ${efficiency.toFixed(2)} км на одиницю палива</p>` +
+          (costPer100 !== null ? `<p><b>Вартість на 100 км:</b> ${costPer100.toFixed(2)} грн</p>` : "") +
+          (totalCost !== null ? `<p><b>Загальна вартість поїздки:</b> ${totalCost.toFixed(2)} грн</p>` : "");
+      } else {
+        document.getElementById('result').innerHTML = "<p style='color:red'>Введіть правильні значення!</p>";
+      }
+    }
+
+    function saveResult() {
+      if (!lastCalculation) {
+        alert("Спочатку виконайте розрахунок!");
+        return;
+      }
+
+      let history = JSON.parse(localStorage.getItem('fuelHistory')) || [];
+      history.push(lastCalculation);
+      localStorage.setItem('fuelHistory', JSON.stringify(history));
+
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const history = JSON.parse(localStorage.getItem('fuelHistory')) || [];
+      const tableBody = document.querySelector('#historyTable tbody');
+      tableBody.innerHTML = "";
+
+      history.forEach((entry, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${entry.station || '-'}</td>
+          <td>${entry.fuelType || '-'}</td>
+          <td>${entry.consumption.toFixed(2)}</td>
+          <td>${entry.efficiency.toFixed(2)}</td>
+          <td>${entry.costPer100 !== null ? entry.costPer100.toFixed(2) : '-'}</td>
+          <td>${entry.totalCost !== null ? entry.totalCost.toFixed(2) : '-'}</td>
+          <td><button class="delete-btn" onclick="deleteEntry(${index})">Видалити</button></td>
+        `;
+        tableBody.appendChild(row);
+      });
+    }
+
+    function deleteEntry(index) {
+      let history = JSON.parse(localStorage.getItem('fuelHistory')) || [];
+      history.splice(index, 1);
+      localStorage.setItem('fuelHistory', JSON.stringify(history));
+      renderHistory();
+    }
+
+    window.onload = () => {
+      renderHistory();
+    }
+
+    function sortTable(colIndex) {
+      const table = document.getElementById("historyTable");
+      const tbody = table.tBodies[0];
+      const rows = Array.from(tbody.querySelectorAll("tr"));
+
+      const isNumeric = colIndex >= 2 && colIndex <= 5;
+      const currentSort = table.getAttribute("data-sort") || "";
+      const [lastCol, lastDir] = currentSort.split(":");
+      let dir = "asc";
+
+      if (parseInt(lastCol) === colIndex && lastDir === "asc") {
+        dir = "desc";
+      }
+
+      rows.sort((a, b) => {
+        let valA = a.cells[colIndex].innerText;
+        let valB = b.cells[colIndex].innerText;
+
+        if (isNumeric) {
+          valA = parseFloat(valA) || 0;
+          valB = parseFloat(valB) || 0;
+        }
+
+        if (valA < valB) return dir === "asc" ? -1 : 1;
+        if (valA > valB) return dir === "asc" ? 1 : -1;
+        return 0;
+      });
+
+      tbody.innerHTML = "";
+      rows.forEach(row => tbody.appendChild(row));
+      table.setAttribute("data-sort", `${colIndex}:${dir}`);
+    }
+  </script>
+</body>
+</html>
